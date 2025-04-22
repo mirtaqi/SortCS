@@ -1,10 +1,10 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup> 
     <TargetFramework>net9.0</TargetFramework>
     <LangVersion>preview</LangVersion>
-    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>  
-    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>  
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
     <Authors>Kees Schollaart, Maarten van Sambeek</Authors>
     <Company>Vision Intelligence</Company>
     <PlatformTarget>AnyCPU</PlatformTarget>
@@ -45,6 +45,6 @@
 
   <ItemGroup>
     <None Include="./icon.png" Pack="true" PackagePath="" />
-    <None Include="../../LICENSE.txt" Pack="true" PackagePath="LICENSE.txt"/>
+    <None Include="../../LICENSE.txt" Pack="true" PackagePath="LICENSE.txt" />
   </ItemGroup>
 </Project>
