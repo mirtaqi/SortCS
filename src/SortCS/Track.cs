@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 
@@ -16,4 +17,5 @@ public record Track
     public TrackState State { get; set; }
 
     public RectangleF Prediction { get; set; }
+    public DateTime UpdatedAt { get; set; } = DateTime.Now;
 }

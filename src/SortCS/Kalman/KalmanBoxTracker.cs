@@ -59,6 +59,9 @@ internal class KalmanBoxTracker
         });
 
     private readonly KalmanFilter _filter;
+    public DateTime? LastPredicateAt { get; set; }
+
+    public RectangleF? LastPredication { get; private set; }
 
     public KalmanBoxTracker(RectangleF box)
     {
@@ -76,6 +79,22 @@ internal class KalmanBoxTracker
     public void Update(RectangleF box)
     {
         _filter.Update(ToMeasurement(box));
+    }
+    public RectangleF? Predict(TimeSpan timeThreshold)
+    {
+        if (LastPredicateAt.HasValue && DateTime.Now.Subtract(LastPredicateAt.Value) < timeThreshold)
+        {
+            return LastPredication;
+        }
+        LastPredicateAt = DateTime.Now;
+        if (_filter.CurrentState[6] + _filter.CurrentState[2] <= 0f)
+        {
+            _filter.SetState(6, 0f);
+        }
+        _filter.Predict();
+        RectangleF prediction = ToBoundingBox(_filter.CurrentState);
+        LastPredication = prediction;
+        return prediction;
     }
 
     public RectangleF Predict()
