@@ -18,4 +18,5 @@ public record Track
 
     public RectangleF Prediction { get; set; }
     public DateTime UpdatedAt { get; set; } = DateTime.Now;
+    public bool IsDirty { get; set; } = true;
 }

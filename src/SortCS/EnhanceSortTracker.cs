@@ -46,8 +46,9 @@ public class EnhanceSortTracker : ITracker
 		Dictionary<int, RectangleF> predictions = new Dictionary<int, RectangleF>();
 		Dictionary<int, (Track Track, KalmanBoxTracker Tracker)> notInPredications = new Dictionary<int, (Track, KalmanBoxTracker)>();
 		foreach (KeyValuePair<int, (Track, KalmanBoxTracker)> tracker in _trackers)
-		{
-			RectangleF? prediction = tracker.Value.Item2.Predict(rotationTime * 0.8);
+        {
+            //RectangleF? prediction = tracker.Value.Item2.Predict();
+            RectangleF ? prediction = tracker.Value.Item2.Predict(rotationTime * 0.8);
 			if (prediction.HasValue)
 			{
 				predictions.Add(tracker.Key, prediction.Value);
@@ -73,17 +74,26 @@ public class EnhanceSortTracker : ITracker
 			track.Item1.Prediction = prediction2.Value;
 			track.Item1.UpdatedAt = DateTime.Now;
 			track.Item2.LastPredicateAt = DateTime.Now;
+            track.Item1.IsDirty = true;
 			activeTrackids.Add(track.Item1.TrackId);
 		}
 		IEnumerable<Track> missedTracks = from x in _trackers
 			where !notInPredications.ContainsKey(x.Key) && !activeTrackids.Contains(x.Key) && DateTime.Now.Subtract(x.Value.Track.UpdatedAt) > TrackMissTimeout
 			select x.Value.Track;
 		foreach (Track missedTrack in missedTracks)
-		{
-			missedTrack.Misses++;
-			missedTrack.TotalMisses++;
-			missedTrack.State = TrackState.Ending;
-		}
+        {
+            var previousMisses = missedTrack.Misses;
+            var timeDiff = DateTime.Now.Subtract(missedTrack.UpdatedAt);
+            var calculatedMiss =(int) (timeDiff / rotationTime);
+            var missDif = calculatedMiss - previousMisses;
+            if (calculatedMiss > 0)
+            {
+                missedTrack.Misses = calculatedMiss;
+                missedTrack.TotalMisses += missDif;
+                missedTrack.State = TrackState.Ending;
+				missedTrack.IsDirty=true;
+            }
+        }
 		List<KeyValuePair<int, (Track, KalmanBoxTracker)>> toRemove = _trackers.Where<KeyValuePair<int, (Track, KalmanBoxTracker)>>((KeyValuePair<int, (Track Track, KalmanBoxTracker Tracker)> x) => x.Value.Track.Misses > MaxMisses).ToList();
 		foreach (KeyValuePair<int, (Track, KalmanBoxTracker)> tr in toRemove)
 		{
@@ -100,7 +110,8 @@ public class EnhanceSortTracker : ITracker
 				State = TrackState.Started,
 				TotalMisses = 0,
 				Prediction = unmatchedBox,
-				UpdatedAt = DateTime.Now
+				UpdatedAt = DateTime.Now,
+				IsDirty = true
 			};
 			_trackers.Add(track2.TrackId, (track2, new KalmanBoxTracker(unmatchedBox)));
 		}
