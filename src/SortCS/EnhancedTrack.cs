@@ -1,10 +1,12 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
 
 namespace SortCS;
-
-public record Track
+public record EnhancedTrack
 {
     public int TrackId { get; set; }
 
@@ -12,7 +14,7 @@ public record Track
 
     public int Misses { get; set; }
 
-    public List<RectangleF> History { get; set; }
+    public List<RectangleModel> History { get; set; }
 
     public TrackState State { get; set; }
 
