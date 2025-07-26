@@ -44,9 +44,9 @@ public class BlobSortTracker : ITracker
         throw new NotImplementedException();
     }
 
-    public IEnumerable<EnhancedTrack> Track(IEnumerable<RectangleModel> boxes, TimeSpan rotationTime)
+    public IEnumerable<EnhancedTrack> Track(IEnumerable<RectangleModel> boxes, TimeSpan rotationTime,double initialIou,double iou)
     {
-        Dictionary<int, RectangleF> predictions = new Dictionary<int, RectangleF>();
+        Dictionary<int, (RectangleF rect, EnhancedTrack track)> predictions = new Dictionary<int, (RectangleF rect, EnhancedTrack track)>();
         Dictionary<int, (EnhancedTrack Track, KalmanBoxTracker Tracker)> notInPredications = new Dictionary<int, (EnhancedTrack, KalmanBoxTracker)>();
         foreach (KeyValuePair<int, (EnhancedTrack, KalmanBoxTracker)> tracker in _trackers)
         {
@@ -54,7 +54,7 @@ public class BlobSortTracker : ITracker
             RectangleF? prediction = tracker.Value.Item2.Predict(rotationTime * 0.8);
             if (prediction.HasValue)
             {
-                predictions.Add(tracker.Key, prediction.Value);
+                predictions.Add(tracker.Key, (prediction.Value,tracker.Value.Item1));
             }
             else
             {
@@ -62,7 +62,7 @@ public class BlobSortTracker : ITracker
             }
         }
         var boxesArray = boxes.ToArray();
-        (Dictionary<int, RectangleModel?> Matched, ICollection<RectangleModel?> Unmatched) tuple = MatchDetectionsWithPredictions(boxesArray, predictions.Values);
+        (Dictionary<int, RectangleModel?> Matched, ICollection<RectangleModel?> Unmatched) tuple = MatchDetectionsWithPredictions(boxesArray, predictions.Values,initialIou,iou);
         Dictionary<int, RectangleModel?> matchedBoxes = tuple.Matched;
         ICollection<RectangleModel> unmatchedBoxes = tuple.Unmatched;
         HashSet<int> activeTrackids = new HashSet<int>();
@@ -70,7 +70,7 @@ public class BlobSortTracker : ITracker
         {
             if(item.Key<0 || item.Value is null)
                 continue;
-            KeyValuePair<int, RectangleF> prediction2 = predictions.ElementAt(item.Key);
+            KeyValuePair<int, RectangleF> prediction2 =new KeyValuePair<int, RectangleF>(predictions.ElementAt(item.Key).Key,predictions.ElementAt(item.Key).Value.rect);
             (EnhancedTrack, KalmanBoxTracker) track = _trackers[prediction2.Key];
             track.Item1.History.Add(item.Value);
             track.Item1.Misses = 0;
@@ -146,19 +146,19 @@ public class BlobSortTracker : ITracker
         }
     }
 
-    private (Dictionary<int, RectangleModel?> Matched, ICollection<RectangleModel> Unmatched) MatchDetectionsWithPredictions(RectangleModel[] boxes, ICollection<RectangleF> trackPredictions)
+    private (Dictionary<int, RectangleModel?> Matched, ICollection<RectangleModel> Unmatched) MatchDetectionsWithPredictions(RectangleModel[] boxes, ICollection<(RectangleF rect,EnhancedTrack track)> trackPredictions, double initialIou, double iou)
     {
         if (trackPredictions.Count == 0)
         {
             return (Matched: new Dictionary<int, RectangleModel?>(), Unmatched: boxes);
         }
         int[,] matrix = new int[boxes.Length, trackPredictions.Count];
-        RectangleF[] trackPredictionsArray = trackPredictions.ToArray();
+        var trackPredictionsArray = trackPredictions.ToArray();
         for (int i = 0; i < boxes.Length; i++)
         {
             for (int j = 0; j < trackPredictionsArray.Length; j++)
             {
-                matrix[i, j] = (int)(-100f * IoU(boxes[i].Box, trackPredictionsArray[j]));
+                matrix[i, j] = (int)(-100f * IoU(boxes[i].Box, trackPredictionsArray[j].rect));
             }
         }
         if (boxes.Length > trackPredictions.Count)
@@ -167,10 +167,16 @@ public class BlobSortTracker : ITracker
             matrix = Enumerable.Range(0, boxes.Length).SelectMany((int row) => (from col in Enumerable.Range(0, trackPredictions.Count)
                                                                                 select matrix[row, col]).Concat(extra)).ToArray(boxes.Length, boxes.Length);
         }
+
+        var getIotThreshold = (int index) =>
+        {
+            var v= trackPredictionsArray[index].track.IsConfirmed?iou:initialIou;
+            return (int)((0f - v) * 100f);
+        };
         int[,] original = (int[,])matrix.Clone();
         int minimalThreshold = (int)((0f - IouThreshold) * 100f);
         Dictionary<int, int> boxTrackerMapping = (from bt in matrix.FindAssignments().Select((int ti, int bi) => (bi: bi, ti: ti))
-                                                  where bt.ti < trackPredictions.Count && original[bt.bi, bt.ti] <= minimalThreshold
+                                                  where bt.ti < trackPredictions.Count && original[bt.bi, bt.ti] <=  getIotThreshold(bt.ti)
                                                   select bt).ToDictionary(((int bi, int ti) bt) => bt.bi, ((int bi, int ti) bt) => bt.ti);
         RectangleModel[] unmatchedBoxes = boxes.Where((RectangleModel _, int index) => !boxTrackerMapping.ContainsKey(index)).ToArray();
         int value;

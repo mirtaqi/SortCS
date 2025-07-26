@@ -22,4 +22,5 @@ public record EnhancedTrack
     public DateTime UpdatedAt { get; set; } = DateTime.Now;
     public bool IsDirty { get; set; } = true;
     public object? Tag { get; set; }
+    public bool IsConfirmed { get; set; }
 }
